@@ -14,6 +14,7 @@ from app.routers import (
     enrollments,
     messages,
     reviews,
+    topics,
 )
 
 
@@ -43,6 +44,7 @@ app.include_router(classes.router)
 app.include_router(enrollments.router)
 app.include_router(messages.router)
 app.include_router(reviews.router)
+app.include_router(topics.router)
 
 
 @app.get("/")

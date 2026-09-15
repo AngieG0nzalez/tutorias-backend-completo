@@ -7,6 +7,13 @@ from app.models.enrollment import Enrollment
 from app.models.message import Message
 from app.models.review import Review
 
+from app.models.topic import Topic
+from app.models.exercise import Exercise
+from app.models.exercise_option import ExerciseOption
+from app.models.exercise_attempt import ExerciseAttempt
+from app.models.student_progress import StudentProgress
+
+
 __all__ = [
     "User",
     "Tutor",
@@ -16,4 +23,10 @@ __all__ = [
     "Enrollment",
     "Message",
     "Review",
+
+    "Topic",
+    "Exercise",
+    "ExerciseOption",
+    "ExerciseAttempt",
+    "StudentProgress",
 ]
