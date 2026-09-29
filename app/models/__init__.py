@@ -13,6 +13,9 @@ from app.models.exercise_option import ExerciseOption
 from app.models.exercise_attempt import ExerciseAttempt
 from app.models.student_progress import StudentProgress
 
+from app.models.student_profile import StudentProfile
+from app.models.registration_request import RegistrationRequest
+
 
 __all__ = [
     "User",
@@ -29,4 +32,7 @@ __all__ = [
     "ExerciseOption",
     "ExerciseAttempt",
     "StudentProgress",
+
+    "StudentProfile",
+    "RegistrationRequest",
 ]

@@ -74,3 +74,16 @@ class User(Base):
         "Review",
         back_populates="user",
     )
+
+    student_profile = relationship(
+        "StudentProfile",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    reviewed_registration_requests = relationship(
+        "RegistrationRequest",
+        foreign_keys="RegistrationRequest.reviewed_by",
+        back_populates="reviewer",
+    )

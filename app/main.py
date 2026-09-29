@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.responses import HTMLResponse
 
 import app.models
 
@@ -15,6 +17,7 @@ from app.routers import (
     messages,
     reviews,
     topics,
+    admin
 )
 
 
@@ -22,7 +25,40 @@ app = FastAPI(
     title="Tutorías API",
     description="API REST para la plataforma educativa de tutorías",
     version="1.0.0",
+    docs_url=None,
 )
+
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui():
+    swagger_html = get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=f"{app.title} - Documentación",
+    )
+
+    html = swagger_html.body.decode("utf-8")
+
+    dark_css = """
+    <style>
+        body {
+            background-color: #121212 !important;
+        }
+
+        .swagger-ui {
+            filter: invert(88%) hue-rotate(180deg);
+        }
+
+        .swagger-ui .microlight {
+            filter: invert(100%) hue-rotate(180deg);
+        }
+    </style>
+    """
+
+    html = html.replace(
+        "</head>",
+        f"{dark_css}</head>"
+    )
+
+    return HTMLResponse(content=html)
 
 
 app.add_middleware(
@@ -45,6 +81,7 @@ app.include_router(enrollments.router)
 app.include_router(messages.router)
 app.include_router(reviews.router)
 app.include_router(topics.router)
+app.include_router(admin.router)
 
 
 @app.get("/")
