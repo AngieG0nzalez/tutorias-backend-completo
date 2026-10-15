@@ -11,6 +11,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
+    relationship,
 )
 
 from sqlalchemy.sql import func
@@ -82,4 +83,19 @@ class ExerciseAttempt(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+    )
+
+    user = relationship(
+        "User",
+        back_populates="exercise_attempts",
+    )
+
+    exercise = relationship(
+        "Exercise",
+        back_populates="attempts",
+    )
+
+    selected_option = relationship(
+        "ExerciseOption",
+        back_populates="attempts",
     )

@@ -72,3 +72,8 @@ class Topic(Base):
         "Exercise",
         back_populates="topic",
     )
+
+    student_progress = relationship(
+        "StudentProgress",
+        back_populates="topic",
+    )

@@ -22,3 +22,11 @@ class ReviewResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
     )
+
+class ReviewCreate(BaseModel):
+    tutor_id: int = Field(gt=0)
+    class_id: int = Field(gt=0)
+    rating: int = Field(ge=1, le=5)
+    comment: str | None = Field(default=None, max_length=2000)
+
+    model_config = ConfigDict(extra="forbid")

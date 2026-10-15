@@ -42,6 +42,7 @@ ALLOWED_PUBLIC_ROLES = {
 }
 
 
+
 @router.post(
     "/register-request",
     response_model=RegistrationRequestResponse,
@@ -51,9 +52,13 @@ def create_registration_request(
     data: RegistrationRequestCreate,
     db: Session = Depends(get_db),
 ):
+    # 1. Normalizar el correo electrónico
+    email = str(data.email).strip().lower()
+
+    # 2. Verificar si ya existe un usuario registrado
     existing_user = db.scalar(
         select(User).where(
-            User.email == data.email
+            User.email.ilike(email)
         )
     )
 
@@ -63,9 +68,10 @@ def create_registration_request(
             detail="El correo ya pertenece a un usuario registrado",
         )
 
+    # 3. Verificar si existe una solicitud pendiente
     pending_request = db.scalar(
         select(RegistrationRequest).where(
-            RegistrationRequest.email == data.email,
+            RegistrationRequest.email.ilike(email),
             RegistrationRequest.status == "pending",
         )
     )
@@ -76,9 +82,10 @@ def create_registration_request(
             detail="Ya existe una solicitud pendiente para este correo",
         )
 
+    # 4. Crear solicitud de registro
     registration_request = RegistrationRequest(
-        name=data.name,
-        email=data.email,
+        name=data.name.strip(),
+        email=email,
         password_hash=hash_password(data.password),
         requested_role=data.requested_role,
         grade=data.grade,
@@ -87,6 +94,7 @@ def create_registration_request(
 
     db.add(registration_request)
 
+    # 5. Guardar solicitud en PostgreSQL
     try:
         db.commit()
         db.refresh(registration_request)
@@ -96,50 +104,11 @@ def create_registration_request(
 
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="No fue posible crear la solicitud de registro",
+            detail="No fue posible crear la solicitud. Verifica si ya existe.",
         )
 
+    # 6. Devolver solicitud sin exponer la contraseña
     return registration_request
-
-    # El registro público nunca puede crear administradores.
-    if data.role not in ALLOWED_PUBLIC_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Rol no permitido para registro público",
-        )
-
-
-    existing_user = db.scalar(
-        select(User).where(
-            User.email == data.email,
-        )
-    )
-
-
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="El correo ya está registrado",
-        )
-
-
-    user = User(
-        name=data.name,
-        email=data.email,
-        password_hash=hash_password(
-            data.password,
-        ),
-        role=data.role,
-    )
-
-
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-
-
-    return user
-
 
 @router.post(
     "/login",
@@ -184,6 +153,7 @@ def login(
     token = create_access_token({
         "sub": str(user.id),
         "role": user.role,
+        "sv": user.session_version,
     })
 
 

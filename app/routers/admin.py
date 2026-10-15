@@ -176,3 +176,66 @@ def reject_registration_request(
         "status": registration_request.status,
         "message": "Solicitud rechazada correctamente",
     }
+
+
+@router.get(
+    "/registration-requests/history",
+    response_model=list[RegistrationRequestResponse],
+)
+def get_registration_requests_history(
+    request_status: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
+    """
+    Consulta el historial de solicitudes.
+
+    Filtros:
+    - pending
+    - approved
+    - rejected
+
+    Sin filtro devuelve todas las solicitudes.
+    """
+
+    allowed_statuses = {
+        "pending",
+        "approved",
+        "rejected",
+    }
+
+    if (
+        request_status is not None
+        and request_status not in allowed_statuses
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Estado de solicitud no válido",
+        )
+
+    if limit < 1 or limit > 100 or offset < 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Paginación inválida",
+        )
+
+    query = select(RegistrationRequest)
+
+    if request_status is not None:
+        query = query.where(
+            RegistrationRequest.status == request_status
+        )
+
+    query = (
+        query
+        .order_by(
+            RegistrationRequest.created_at.desc(),
+            RegistrationRequest.id.desc(),
+        )
+        .offset(offset)
+        .limit(limit)
+    )
+
+    return db.scalars(query).all()

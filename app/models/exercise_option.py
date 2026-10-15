@@ -71,3 +71,8 @@ class ExerciseOption(Base):
         "Exercise",
         back_populates="options",
     )
+
+    attempts = relationship(
+        "ExerciseAttempt",
+        back_populates="selected_option",
+    )

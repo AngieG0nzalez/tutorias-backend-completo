@@ -17,7 +17,13 @@ from app.routers import (
     messages,
     reviews,
     topics,
-    admin
+    admin,
+    attempts,
+    progress,
+    adaptive,
+    admin_users,
+    tutor_panel,
+    account,
 )
 
 
@@ -82,7 +88,12 @@ app.include_router(messages.router)
 app.include_router(reviews.router)
 app.include_router(topics.router)
 app.include_router(admin.router)
-
+app.include_router(attempts.router)
+app.include_router(progress.router)
+app.include_router(adaptive.router)
+app.include_router(admin_users.router)
+app.include_router(tutor_panel.router)
+app.include_router(account.router)
 
 @app.get("/")
 def root():

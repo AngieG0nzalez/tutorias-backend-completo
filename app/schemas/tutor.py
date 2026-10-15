@@ -1,20 +1,25 @@
+
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TutorCreate(BaseModel):
     user_id: int
     bio: str | None = None
-    specialty: str | None = None
-    experience_years: int = 0
+    specialty: str | None = Field(default=None, max_length=100)
+    experience_years: int = Field(default=0, ge=0)
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class TutorUpdate(BaseModel):
     bio: str | None = None
-    specialty: str | None = None
-    experience_years: int | None = None
+    specialty: str | None = Field(default=None, max_length=100)
+    experience_years: int | None = Field(default=None, ge=0)
     is_active: bool | None = None
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class TutorResponse(BaseModel):
@@ -26,6 +31,4 @@ class TutorResponse(BaseModel):
     rating: Decimal | None
     is_active: bool
 
-    model_config = ConfigDict(
-        from_attributes=True,
-    )
+    model_config = ConfigDict(from_attributes=True)

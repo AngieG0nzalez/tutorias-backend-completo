@@ -88,7 +88,12 @@ class Exercise(Base):
 
 
     options = relationship(
-    "ExerciseOption",
-    back_populates="exercise",
-    order_by="ExerciseOption.order_number",
+        "ExerciseOption",
+        back_populates="exercise",
+        order_by="ExerciseOption.order_number",
+    )
+
+    attempts = relationship(
+        "ExerciseAttempt",
+        back_populates="exercise",
     )

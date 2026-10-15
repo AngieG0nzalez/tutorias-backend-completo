@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -12,7 +13,12 @@ class ClassCreate(BaseModel):
     date_time: datetime
     duration_minutes: int = Field(gt=0)
     price: Decimal = Field(default=Decimal("0.00"), ge=0)
-    status: str = "scheduled"
+    status: Literal[
+        "scheduled",
+        "in_progress",
+        "completed",
+        "cancelled",
+    ] = "scheduled"
 
 
 class ClassUpdate(BaseModel):
@@ -23,7 +29,12 @@ class ClassUpdate(BaseModel):
     date_time: datetime | None = None
     duration_minutes: int | None = Field(default=None, gt=0)
     price: Decimal | None = Field(default=None, ge=0)
-    status: str | None = None
+    status: Literal[
+        "scheduled",
+        "in_progress",
+        "completed",
+        "cancelled",
+    ] | None = None
 
 
 class ClassResponse(BaseModel):

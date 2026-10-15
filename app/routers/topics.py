@@ -1,6 +1,8 @@
 from fastapi import (
     APIRouter,
     Depends,
+    HTTPException,
+    status,
 )
 
 from sqlalchemy import (
@@ -67,6 +69,13 @@ def get_topic_exercises(
     topic_id: int,
     db: Session = Depends(get_db),
 ):
+    topic = db.get(Topic, topic_id)
+
+    if topic is None or not topic.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tema no encontrado",
+    )
 
     query = (
         select(Exercise)

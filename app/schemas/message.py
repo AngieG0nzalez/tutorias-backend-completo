@@ -19,3 +19,9 @@ class MessageResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
     )
+
+class MessageCreate(BaseModel):
+    receiver_id: int = Field(gt=0)
+    content: str = Field(min_length=1, max_length=5000)
+
+    model_config = ConfigDict(extra="forbid")

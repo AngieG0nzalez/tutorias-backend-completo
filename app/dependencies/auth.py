@@ -29,13 +29,11 @@ def get_current_user(
     token = credentials.credentials
 
     try:
-
         payload = decode_access_token(token)
 
         user_id = payload.get("sub")
 
         if user_id is None:
-
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token inválido",
@@ -48,34 +46,36 @@ def get_current_user(
         ValueError,
         TypeError,
     ):
-
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido o expirado",
         )
 
-
-    user = db.get(
-        User,
-        user_id,
-    )
-
+    user = db.get(User, user_id)
 
     if user is None:
-
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario no encontrado",
         )
 
-
     if not user.is_active:
-
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuario inactivo",
         )
 
+    # 🔐 PASO 12.5: INVALIDACIÓN DE SESIONES
+    token_version = payload.get("sv")
+
+    if (
+        type(token_version) is not int
+        or token_version != user.session_version
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesión inválida. Inicia sesión nuevamente.",
+        )
 
     return user
 
@@ -86,6 +86,29 @@ def require_admin(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Se requieren permisos de administrador",
+        )
+
+    return current_user
+
+def require_student(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    if current_user.role != "student":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requieren permisos de estudiante",
+        )
+
+    return current_user
+
+
+def require_tutor(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    if current_user.role != "tutor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requieren permisos de tutor",
         )
 
     return current_user

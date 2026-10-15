@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String, func
+from sqlalchemy import Boolean, DateTime, String, func,Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -87,3 +87,22 @@ class User(Base):
         foreign_keys="RegistrationRequest.reviewed_by",
         back_populates="reviewer",
     )
+
+    exercise_attempts = relationship(
+        "ExerciseAttempt",
+        back_populates="user",
+    )
+
+    student_progress = relationship(
+        "StudentProgress",
+        back_populates="user",
+    )
+
+    # Dentro de class User:
+    session_version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+   

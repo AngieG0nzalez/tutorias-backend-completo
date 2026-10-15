@@ -13,6 +13,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
+    relationship,
 )
 
 from sqlalchemy.sql import func
@@ -89,4 +90,14 @@ class StudentProgress(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+    )
+
+    user = relationship(
+        "User",
+        back_populates="student_progress",
+    )
+
+    topic = relationship(
+        "Topic",
+        back_populates="student_progress",
     )
