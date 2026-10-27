@@ -1,3 +1,4 @@
+from decimal import Decimal
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -22,3 +23,19 @@ class EnrollmentResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
     )
+
+
+class StudentClassCatalogItem(BaseModel):
+    class_id: int
+    title: str
+    description: str | None
+    date_time: datetime
+    duration_minutes: int
+    price: Decimal
+    status: str
+    subject_id: int
+    subject_name: str
+    subject_grade: int
+    tutor_name: str
+    tutor_specialty: str | None
+    enrollment_id: int | None

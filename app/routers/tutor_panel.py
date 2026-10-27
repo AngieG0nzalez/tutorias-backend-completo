@@ -7,7 +7,10 @@ from app.database.connection import get_db
 from app.dependencies.auth import require_tutor
 from app.models.class_model import TutoringClass
 from app.models.enrollment import Enrollment
+from app.models.student_profile import StudentProfile
+from app.models.student_progress import StudentProgress
 from app.models.subject import Subject
+from app.models.topic import Topic
 from app.models.tutor import Tutor
 from app.models.tutor_subject import TutorSubject
 from app.models.user import User
@@ -17,6 +20,10 @@ from app.schemas.tutor_panel import (
     TutorPanelStudent,
     TutorPanelSubject,
     TutorPanelSummary,
+    TutorStudentProgressResponse,
+    TutorStudentProgressSummary,
+    TutorStudentSubjectInfo,
+    TutorStudentTopicProgress,
 )
 
 
@@ -137,6 +144,125 @@ def get_my_class_students(
         )
         for enrollment, student in rows
     ]
+
+
+@router.get(
+    "/classes/{class_id}/students/{student_user_id}/progress",
+    response_model=TutorStudentProgressResponse,
+)
+def get_class_student_progress(
+    class_id: int,
+    student_user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_tutor),
+):
+    """
+    Progreso global del estudiante en la materia de una clase propia.
+    No es progreso atribuible a la clase: student_progress es por tema.
+    """
+    not_found = HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Estudiante o clase no disponible",
+    )
+
+    tutor = db.scalar(
+        select(Tutor).where(Tutor.user_id == current_user.id)
+    )
+    if tutor is None:
+        raise not_found
+
+    # Clase propia + inscripción activa en ESA clase + usuario estudiante.
+    row = db.execute(
+        select(TutoringClass, User)
+        .join(Enrollment, Enrollment.class_id == TutoringClass.id)
+        .join(User, User.id == Enrollment.user_id)
+        .where(
+            TutoringClass.id == class_id,
+            TutoringClass.tutor_id == tutor.id,
+            Enrollment.user_id == student_user_id,
+            Enrollment.status == "enrolled",
+            User.role == "student",
+        )
+        .limit(1)
+    ).first()
+    if row is None:
+        raise not_found
+    tutoring_class, student = row
+
+    subject = db.get(Subject, tutoring_class.subject_id)
+    grade = db.scalar(
+        select(StudentProfile.grade).where(
+            StudentProfile.user_id == student.id
+        )
+    )
+
+    # Una sola consulta: temas activos de la materia + progreso del alumno.
+    rows = db.execute(
+        select(Topic, StudentProgress)
+        .outerjoin(
+            StudentProgress,
+            (StudentProgress.topic_id == Topic.id)
+            & (StudentProgress.user_id == student.id),
+        )
+        .where(
+            Topic.subject_id == tutoring_class.subject_id,
+            Topic.is_active.is_(True),
+        )
+        .order_by(Topic.order_number, Topic.id)
+    ).all()
+
+    topics = []
+    for topic, progress in rows:
+        attempted = progress.exercises_attempted if progress else 0
+        topics.append(
+            TutorStudentTopicProgress(
+                topic_id=topic.id,
+                topic_name=topic.name,
+                order_number=topic.order_number,
+                exercises_attempted=attempted,
+                exercises_correct=progress.exercises_correct if progress else 0,
+                mastery_percentage=float(progress.mastery_percentage) if progress else 0.0,
+                level=progress.level if progress else "new",
+                last_practiced_at=progress.last_practiced_at if progress else None,
+                practiced=attempted > 0,
+            )
+        )
+
+    practiced = [t for t in topics if t.practiced]
+    attempted_total = sum(t.exercises_attempted for t in topics)
+    correct_total = sum(t.exercises_correct for t in topics)
+
+    return TutorStudentProgressResponse(
+        class_id=tutoring_class.id,
+        student_user_id=student.id,
+        student_name=student.name,
+        student_grade=grade,
+        subject=TutorStudentSubjectInfo(
+            id=subject.id, name=subject.name, grade=subject.grade
+        ),
+        summary=TutorStudentProgressSummary(
+            total_topics=len(topics),
+            practiced_topics=len(practiced),
+            unpracticed_topics=len(topics) - len(practiced),
+            exercises_attempted=attempted_total,
+            exercises_correct=correct_total,
+            accuracy_percentage=(
+                round(100 * correct_total / attempted_total, 2)
+                if attempted_total
+                else None
+            ),
+            average_mastery_percentage=(
+                round(
+                    sum(t.mastery_percentage for t in practiced)
+                    / len(practiced),
+                    2,
+                )
+                if practiced
+                else None
+            ),
+        ),
+        topics=topics,
+    )
 
 
 @router.get(

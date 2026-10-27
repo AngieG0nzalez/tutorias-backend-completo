@@ -4,14 +4,17 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
-from app.dependencies.auth import get_current_user
+from app.dependencies.auth import get_current_user, require_student
 from app.models.class_model import TutoringClass
 from app.models.enrollment import Enrollment
+from app.models.student_profile import StudentProfile
+from app.models.subject import Subject
 from app.models.tutor import Tutor
 from app.models.user import User
 from app.schemas.enrollment import (
     EnrollmentCreate,
     EnrollmentResponse,
+    StudentClassCatalogItem,
 )
 
 
@@ -58,6 +61,63 @@ def get_enrollments(
         )
 
     return db.scalars(query).all()
+
+
+# Catálogo del estudiante: clases programadas de su grado (sin IDs de tutor ajenos).
+@router.get(
+    "/catalog",
+    response_model=list[StudentClassCatalogItem],
+)
+def get_student_class_catalog(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
+    grade = db.scalar(
+        select(StudentProfile.grade).where(
+            StudentProfile.user_id == current_user.id
+        )
+    )
+
+    if grade is None:
+        return []
+
+    rows = db.execute(
+        select(TutoringClass, Subject, Tutor, User, Enrollment.id)
+        .join(Subject, Subject.id == TutoringClass.subject_id)
+        .join(Tutor, Tutor.id == TutoringClass.tutor_id)
+        .join(User, User.id == Tutor.user_id)
+        .outerjoin(
+            Enrollment,
+            (Enrollment.class_id == TutoringClass.id)
+            & (Enrollment.user_id == current_user.id),
+        )
+        .where(
+            Subject.grade == grade,
+            TutoringClass.status == "scheduled",
+            Tutor.is_active.is_(True),
+            User.is_active.is_(True),
+        )
+        .order_by(TutoringClass.date_time, TutoringClass.id)
+    ).all()
+
+    return [
+        StudentClassCatalogItem(
+            class_id=c.id,
+            title=c.title,
+            description=c.description,
+            date_time=c.date_time,
+            duration_minutes=c.duration_minutes,
+            price=c.price,
+            status=c.status,
+            subject_id=s.id,
+            subject_name=s.name,
+            subject_grade=s.grade,
+            tutor_name=u.name,
+            tutor_specialty=t.specialty,
+            enrollment_id=enrollment_id,
+        )
+        for c, s, t, u, enrollment_id in rows
+    ]
 
 
 # Crear una inscripción
@@ -113,6 +173,23 @@ def create_enrollment(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="La clase no está disponible para inscripciones",
+        )
+
+    student_grade = db.scalar(
+        select(StudentProfile.grade).where(
+            StudentProfile.user_id == student.id
+        )
+    )
+    subject_grade = db.scalar(
+        select(Subject.grade).where(
+            Subject.id == tutoring_class.subject_id
+        )
+    )
+
+    if student_grade is None or student_grade != subject_grade:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta clase no corresponde al grado del estudiante",
         )
 
     existing = db.scalar(

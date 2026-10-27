@@ -23,6 +23,7 @@ from app.models.tutor_subject import TutorSubject
 from app.models.user import User
 from app.schemas.topic import TopicCreate, TopicResponse, TopicUpdate
 from app.models.exercise import Exercise
+from app.services.exercise_service import create_exercise
 from app.models.exercise_option import ExerciseOption
 from app.schemas.exercise import (
     ExerciseCreate,
@@ -234,10 +235,6 @@ def get_topic_exercises(
     return exercises
 
 
-def normalized_statement(text: str) -> str:
-    return " ".join(text.split()).casefold()
-
-
 def get_manageable_topic(
     db: Session,
     current_user: User,
@@ -297,30 +294,7 @@ def create_topic_exercise(
     current_user: User = Depends(require_tutor),
 ):
     get_manageable_topic(db, current_user, topic_id, lock=True)
-    new_key = normalized_statement(data.statement)
-    for existing in load_active_exercises(db, topic_id):
-        if normalized_statement(existing.statement) == new_key:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Ya existe una pregunta con ese enunciado en este tema",
-            )
-    exercise = Exercise(
-        topic_id=topic_id,
-        statement=data.statement,
-        difficulty=data.difficulty,
-        explanation=data.explanation.strip() if data.explanation else None,
-        is_ai_generated=False,
-        is_active=True,
-    )
-    exercise.options = [
-        ExerciseOption(
-            option_text=o.option_text,
-            is_correct=o.is_correct,
-            order_number=i,
-        )
-        for i, o in enumerate(data.options, start=1)
-    ]
-    db.add(exercise)
+    exercise = create_exercise(db, topic_id, data)
     db.commit()
     db.refresh(exercise)
     return exercise

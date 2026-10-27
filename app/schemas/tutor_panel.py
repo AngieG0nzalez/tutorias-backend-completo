@@ -53,3 +53,41 @@ class TutorPanelSummary(BaseModel):
     cancelled_classes: int
     total_enrollments: int
     total_subjects: int
+
+
+class TutorStudentSubjectInfo(BaseModel):
+    id: int
+    name: str
+    grade: int
+
+
+class TutorStudentTopicProgress(BaseModel):
+    topic_id: int
+    topic_name: str
+    order_number: int
+    exercises_attempted: int
+    exercises_correct: int
+    mastery_percentage: float
+    level: str
+    last_practiced_at: datetime | None
+    practiced: bool
+
+
+class TutorStudentProgressSummary(BaseModel):
+    total_topics: int
+    practiced_topics: int
+    unpracticed_topics: int
+    exercises_attempted: int
+    exercises_correct: int
+    accuracy_percentage: float | None
+    average_mastery_percentage: float | None
+
+
+class TutorStudentProgressResponse(BaseModel):
+    class_id: int
+    student_user_id: int
+    student_name: str
+    student_grade: int | None
+    subject: TutorStudentSubjectInfo
+    summary: TutorStudentProgressSummary
+    topics: list[TutorStudentTopicProgress]

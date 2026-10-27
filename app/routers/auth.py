@@ -5,7 +5,9 @@ from fastapi import (
     status,
 )
 
-from sqlalchemy import select
+from datetime import timedelta
+
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -17,7 +19,9 @@ from app.core.security import (
 
 from app.database.connection import get_db
 
+from app.models.account_security import AccountAudit
 from app.models.registration_request import RegistrationRequest
+from app.services.account_security import audit, now_utc
 from app.models.user import User
 
 from app.schemas.auth import (
@@ -110,6 +114,11 @@ def create_registration_request(
     # 6. Devolver solicitud sin exponer la contraseña
     return registration_request
 
+MAX_LOGIN_FAILURES = 5
+LOGIN_WINDOW_MINUTES = 15
+LOGIN_FAILED_ACTION = "login_failed"
+
+
 @router.post(
     "/login",
     response_model=TokenResponse,
@@ -133,10 +142,28 @@ def login(
         )
 
 
+    # Límite por cuenta respaldado en la BD (compartido entre instancias).
+    window_start = now_utc() - timedelta(minutes=LOGIN_WINDOW_MINUTES)
+    recent_failures = db.scalar(
+        select(func.count(AccountAudit.id)).where(
+            AccountAudit.target_user_id == user.id,
+            AccountAudit.action == LOGIN_FAILED_ACTION,
+            AccountAudit.created_at >= window_start,
+        )
+    )
+    if recent_failures >= MAX_LOGIN_FAILURES:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados intentos fallidos. Inténtalo de nuevo en unos minutos.",
+            headers={"Retry-After": str(LOGIN_WINDOW_MINUTES * 60)},
+        )
+
     if not verify_password(
         data.password,
         user.password_hash,
     ):
+        audit(db, user.id, LOGIN_FAILED_ACTION)
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales incorrectas",

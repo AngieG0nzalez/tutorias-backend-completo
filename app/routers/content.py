@@ -12,8 +12,11 @@ from app.models.topic import Topic
 from app.models.tutor import Tutor
 from app.models.tutor_subject import TutorSubject
 from app.models.user import User
-from app.routers.topics import (
-    get_active_tutor_for_subject,
+from app.routers.topics import get_active_tutor_for_subject
+from app.services.exercise_service import (
+    build_options,
+    duplicate_conflict,
+    find_duplicate,
     normalized_statement,
 )
 from app.schemas.content import (
@@ -143,25 +146,6 @@ def serialize(
     )
 
 
-def find_duplicate(
-    db: Session,
-    topic_id: int,
-    statement: str,
-    exclude_id: int | None = None,
-) -> Exercise | None:
-    key = normalized_statement(statement)
-    rows = db.scalars(
-        select(Exercise).where(
-            Exercise.topic_id == topic_id,
-            Exercise.is_active.is_(True),
-        )
-    ).all()
-    for row in rows:
-        if row.id != exclude_id and normalized_statement(row.statement) == key:
-            return row
-    return None
-
-
 def same_subject_warning(
     db: Session, topic: Topic, statement: str
 ) -> str | None:
@@ -182,24 +166,6 @@ def same_subject_warning(
                 f"de la materia: «{topic_name}»."
             )
     return None
-
-
-def build_options(options) -> list[ExerciseOption]:
-    return [
-        ExerciseOption(
-            option_text=o.option_text,
-            is_correct=o.is_correct,
-            order_number=index,
-        )
-        for index, o in enumerate(options, start=1)
-    ]
-
-
-def duplicate_conflict() -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_409_CONFLICT,
-        detail="Ya existe una pregunta activa con ese enunciado en este tema",
-    )
 
 
 @router.get("/catalog", response_model=list[ContentSubjectCatalog])

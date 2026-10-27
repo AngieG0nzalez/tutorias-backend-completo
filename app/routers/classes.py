@@ -23,6 +23,15 @@ router = APIRouter(
 )
 
 
+# Transiciones permitidas; completed y cancelled son estados finales.
+ALLOWED_TRANSITIONS = {
+    "scheduled": {"in_progress", "completed", "cancelled"},
+    "in_progress": {"completed", "cancelled"},
+    "completed": set(),
+    "cancelled": set(),
+}
+
+
 # Consultar clases disponibles
 @router.get(
     "",
@@ -114,6 +123,12 @@ def create_class(
                 detail="Solo puedes crear clases para materias asignadas",
             )
 
+    if data.status != "scheduled":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Una clase nueva debe crearse como programada",
+        )
+
     tutoring_class = TutoringClass(
         **data.model_dump()
     )
@@ -178,16 +193,29 @@ def update_class(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tu perfil de tutor está inactivo",
         )
-    if is_owner and tutoring_class.status != "scheduled":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Solo puedes editar clases que aún están programadas",
-        )
 
     update_data = data.model_dump(
         exclude_unset=True,
         exclude_none=True,
     )
+
+    new_status = update_data.get("status")
+    if new_status is not None and new_status != tutoring_class.status:
+        if new_status not in ALLOWED_TRANSITIONS[tutoring_class.status]:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Transición de estado no permitida",
+            )
+    else:
+        update_data.pop("status", None)
+
+    # Los datos de la clase solo se editan mientras está programada.
+    other_fields = set(update_data) - {"status"}
+    if other_fields and tutoring_class.status != "scheduled":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Solo puedes editar clases que aún están programadas",
+        )
 
     # No permitir transferir una clase desde este endpoint
     if "tutor_id" in update_data:
