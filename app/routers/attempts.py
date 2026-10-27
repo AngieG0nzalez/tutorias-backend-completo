@@ -2,6 +2,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+
+from app.services.grade_access import ensure_student_can_practice_topic
 from app.services.progress_service import recalculate_student_progress
 
 from app.database.connection import get_db
@@ -59,6 +61,8 @@ def create_attempt(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tema no disponible",
         )
+
+    ensure_student_can_practice_topic(db, current_user, topic)
 
     # La opción debe pertenecer al ejercicio enviado.
     option = db.scalar(

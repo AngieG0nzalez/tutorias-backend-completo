@@ -2,6 +2,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.services.grade_access import ensure_student_can_practice_topic
+
 from app.database.connection import get_db
 from app.dependencies.auth import require_student
 from app.models.topic import Topic
@@ -32,6 +34,8 @@ def get_next_exercise(
             status_code=404,
             detail="Tema no encontrado o inactivo",
         )
+
+    ensure_student_can_practice_topic(db, current_user, topic)
 
     recommendation = recommend_next_exercise(
         db=db,

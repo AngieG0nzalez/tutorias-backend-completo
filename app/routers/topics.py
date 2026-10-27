@@ -242,8 +242,13 @@ def get_manageable_topic(
     db: Session,
     current_user: User,
     topic_id: int,
+    lock: bool = False,
 ) -> Topic:
-    topic = db.get(Topic, topic_id)
+    query = select(Topic).where(Topic.id == topic_id)
+    if lock:
+        # Misma serialización que /content/exercises: evita duplicados concurrentes.
+        query = query.with_for_update()
+    topic = db.scalar(query)
     if topic is None or not topic.is_active:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -291,7 +296,7 @@ def create_topic_exercise(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_tutor),
 ):
-    get_manageable_topic(db, current_user, topic_id)
+    get_manageable_topic(db, current_user, topic_id, lock=True)
     new_key = normalized_statement(data.statement)
     for existing in load_active_exercises(db, topic_id):
         if normalized_statement(existing.statement) == new_key:

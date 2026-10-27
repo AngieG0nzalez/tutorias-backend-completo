@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session
 from app.database.connection import get_db
 from app.dependencies.auth import get_current_user
 from app.models.message import Message
+from app.models.enrollment import Enrollment
+from app.models.tutor import Tutor
+from app.models.class_model import TutoringClass
 from app.models.user import User
 from app.schemas.message import MessageContact, MessageCreate, MessageResponse
 
@@ -128,6 +131,46 @@ def send_message(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="La comunicación debe ser entre estudiante y tutor",
         )
+
+    # Un tutor solo inicia conversación con alumnos inscritos en sus clases
+    # o responde a quien ya le escribió. El estudiante puede escribir a tutores activos.
+    if current_user.role == "student":
+        active_tutor = db.scalar(
+            select(Tutor.id).where(
+                Tutor.user_id == receiver.id,
+                Tutor.is_active.is_(True),
+            )
+        )
+        if active_tutor is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="El tutor no está disponible",
+            )
+    else:
+        has_class = db.scalar(
+            select(Enrollment.id)
+            .join(TutoringClass, TutoringClass.id == Enrollment.class_id)
+            .join(Tutor, Tutor.id == TutoringClass.tutor_id)
+            .where(
+                Tutor.user_id == current_user.id,
+                Enrollment.user_id == receiver.id,
+                Enrollment.status != "cancelled",
+            )
+            .limit(1)
+        )
+        has_written = db.scalar(
+            select(Message.id)
+            .where(
+                Message.sender_id == receiver.id,
+                Message.receiver_id == current_user.id,
+            )
+            .limit(1)
+        )
+        if has_class is None and has_written is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo puedes escribir a estudiantes inscritos en tus clases o que ya te escribieron",
+            )
 
     message = Message(
         sender_id=current_user.id,
