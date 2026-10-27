@@ -15,6 +15,7 @@ from app.models.student_progress import StudentProgress
 
 from app.models.student_profile import StudentProfile
 from app.models.registration_request import RegistrationRequest
+from app.models.suggestion import Suggestion
 
 
 __all__ = [
@@ -35,4 +36,5 @@ __all__ = [
 
     "StudentProfile",
     "RegistrationRequest",
+    "Suggestion",
 ]

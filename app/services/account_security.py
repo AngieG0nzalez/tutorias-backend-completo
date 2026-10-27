@@ -2,6 +2,7 @@ import hashlib
 import os
 import secrets
 import smtplib
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from urllib.parse import urlencode
@@ -49,12 +50,22 @@ def audit(db: Session, target_user_id: int, action: str, actor_user_id: int | No
 def smtp_ready():
     return all(os.getenv(k) for k in ("SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM", "FRONTEND_URL"))
 
-def send_email(to_email: str, subject: str, body: str):
+LOGO_PATH = Path(__file__).resolve().parent.parent / "assets" / "nexo_logo.png"
+
+def send_email(to_email: str, subject: str, body: str, html: str | None = None):
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = os.environ["SMTP_FROM"]
     message["To"] = to_email
     message.set_content(body)
+    if html:
+        message.add_alternative(html, subtype="html")
+        try:
+            message.get_payload()[1].add_related(
+                LOGO_PATH.read_bytes(), "image", "png", cid="<nexo-logo>", filename="nexo.png"
+            )
+        except OSError:
+            pass
     with smtplib.SMTP(os.environ["SMTP_HOST"], int(os.environ["SMTP_PORT"]), timeout=15) as server:
         server.starttls()
         server.login(os.environ["SMTP_USER"], os.environ["SMTP_PASSWORD"])

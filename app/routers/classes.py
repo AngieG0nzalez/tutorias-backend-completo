@@ -8,6 +8,7 @@ from app.dependencies.auth import get_current_user
 from app.models.class_model import TutoringClass
 from app.models.subject import Subject
 from app.models.tutor import Tutor
+from app.models.tutor_subject import TutorSubject
 from app.models.user import User
 from app.schemas.class_schema import (
     ClassCreate,
@@ -82,6 +83,12 @@ def create_class(
             detail="Tutor no encontrado",
         )
 
+    if db.get(Subject, data.subject_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Materia no encontrada",
+        )
+
     if current_user.role == "tutor":
         if tutor.user_id != current_user.id:
             raise HTTPException(
@@ -95,11 +102,17 @@ def create_class(
                 detail="Tu perfil de tutor está inactivo",
             )
 
-    if db.get(Subject, data.subject_id) is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Materia no encontrada",
+        assigned_subject = db.scalar(
+            select(TutorSubject.id).where(
+                TutorSubject.tutor_id == tutor.id,
+                TutorSubject.subject_id == data.subject_id,
+            )
         )
+        if assigned_subject is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo puedes crear clases para materias asignadas",
+            )
 
     tutoring_class = TutoringClass(
         **data.model_dump()
@@ -165,6 +178,11 @@ def update_class(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tu perfil de tutor está inactivo",
         )
+    if is_owner and tutoring_class.status != "scheduled":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Solo puedes editar clases que aún están programadas",
+        )
 
     update_data = data.model_dump(
         exclude_unset=True,
@@ -184,6 +202,18 @@ def update_class(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Materia no encontrada",
             )
+        if is_owner:
+            assigned_subject = db.scalar(
+                select(TutorSubject.id).where(
+                    TutorSubject.tutor_id == tutor.id,
+                    TutorSubject.subject_id == update_data["subject_id"],
+                )
+            )
+            if assigned_subject is None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Solo puedes asignar clases a materias que tienes asignadas",
+                )
 
     for key, value in update_data.items():
         setattr(tutoring_class, key, value)

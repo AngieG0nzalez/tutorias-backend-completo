@@ -27,6 +27,7 @@ class UserResponse(BaseModel):
     name: str
     email: EmailStr
     role: str
+    grade: int | None = None
     is_active: bool
     created_at: datetime
 

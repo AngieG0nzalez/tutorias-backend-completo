@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ClassCreate(BaseModel):
@@ -20,6 +20,14 @@ class ClassCreate(BaseModel):
         "cancelled",
     ] = "scheduled"
 
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value: str) -> str:
+        value = value.strip()
+        if not value or len(value) > 100:
+            raise ValueError("El título debe tener entre 1 y 100 caracteres")
+        return value
+
 
 class ClassUpdate(BaseModel):
     tutor_id: int | None = None
@@ -35,6 +43,16 @@ class ClassUpdate(BaseModel):
         "completed",
         "cancelled",
     ] | None = None
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        value = value.strip()
+        if not value or len(value) > 100:
+            raise ValueError("El título debe tener entre 1 y 100 caracteres")
+        return value
 
 
 class ClassResponse(BaseModel):

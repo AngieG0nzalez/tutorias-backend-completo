@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -24,6 +26,9 @@ from app.routers import (
     admin_users,
     tutor_panel,
     account,
+    admin_tutor_subjects,
+    content,
+    suggestions,
 )
 
 
@@ -70,7 +75,11 @@ async def custom_swagger_ui():
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",
+        o.strip().rstrip("/")
+        for o in os.getenv(
+            "CORS_ORIGINS", "http://localhost:5173"
+        ).split(",")
+        if o.strip()
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -94,6 +103,9 @@ app.include_router(adaptive.router)
 app.include_router(admin_users.router)
 app.include_router(tutor_panel.router)
 app.include_router(account.router)
+app.include_router(admin_tutor_subjects.router)
+app.include_router(content.router)
+app.include_router(suggestions.router)
 
 @app.get("/")
 def root():

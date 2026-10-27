@@ -9,6 +9,7 @@ from app.models.tutor import Tutor
 from app.models.user import User
 from app.schemas.tutor import (
     TutorCreate,
+    TutorDirectoryItem,
     TutorResponse,
     TutorUpdate,
 )
@@ -31,6 +32,39 @@ def get_tutors(
     return db.scalars(
         select(Tutor).order_by(Tutor.id)
     ).all()
+
+
+# Directorio mínimo para que estudiantes y tutores elijan destinatario de mensajes.
+# Solo expone users.id, nombre y especialidad de tutores activos.
+@router.get(
+    "/directory",
+    response_model=list[TutorDirectoryItem],
+)
+def get_tutor_directory(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role not in ("student", "tutor"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Rol no autorizado",
+        )
+
+    rows = db.execute(
+        select(User.id, User.name, Tutor.specialty)
+        .join(Tutor, Tutor.user_id == User.id)
+        .where(
+            Tutor.is_active.is_(True),
+            User.is_active.is_(True),
+            User.role == "tutor",
+        )
+        .order_by(User.name)
+    ).all()
+
+    return [
+        TutorDirectoryItem(user_id=r[0], name=r[1], specialty=r[2])
+        for r in rows
+    ]
 
 
 # Consulta pública de un tutor

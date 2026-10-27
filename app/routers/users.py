@@ -7,6 +7,7 @@ from app.database.connection import get_db
 from app.dependencies.auth import get_current_user, require_admin
 from app.models.user import User
 from app.schemas.user import UserResponse, UserUpdate
+from app.models import StudentProfile
 
 
 router = APIRouter(
@@ -36,8 +37,30 @@ def get_users(
 )
 def get_me(
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    return current_user
+    grade = None
+
+    if current_user.role == "student":
+        profile = db.execute(
+            select(StudentProfile).where(
+                StudentProfile.user_id == current_user.id
+            )
+        ).scalar_one_or_none()
+
+        if profile is not None:
+            grade = profile.grade
+
+    return UserResponse(
+        id=current_user.id,
+        name=current_user.name,
+        email=current_user.email,
+        role=current_user.role,
+        grade=grade,
+        is_active=current_user.is_active,
+        created_at=current_user.created_at,
+    )
+
 
 
 # Consultar un usuario:

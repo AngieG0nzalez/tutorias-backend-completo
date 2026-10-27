@@ -11,6 +11,7 @@ from app.models.account_security import AccountToken
 from app.models.user import User
 from app.schemas.account import (MessageResponse, ChangePasswordRequest, ForgotPasswordRequest,
     ResetPasswordRequest, ChangeEmailRequest, ConfirmEmailRequest, AdminResetRequest, AdminResetResponse)
+from app.services.email_templates import email_change_email, password_reset_email
 from app.services.account_security import (TOKEN_MINUTES, EMAIL_TOKEN_MINUTES, now_utc, issue_token,
     get_token_locked, revoke_all_tokens, audit, smtp_ready, send_email, frontend_link)
 
@@ -50,8 +51,9 @@ def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
     raw = issue_token(db, user.id, "password_reset")
     db.commit()
     try:
-        send_email(user.email, "Nexo: recupera tu contraseña",
-            "Abre este enlace para establecer una nueva contraseña (15 minutos):\n" + frontend_link("reset-password", raw))
+        link = frontend_link("reset-password", raw)
+        text, html = password_reset_email(link, TOKEN_MINUTES)
+        send_email(user.email, "Nexo: recupera tu contraseña", text, html)
     except Exception:
         logger.exception("No fue posible enviar el correo de recuperación")
     return message
@@ -94,8 +96,9 @@ def request_email_change(data: ChangeEmailRequest, db: Session = Depends(get_db)
     raw = issue_token(db, current_user.id, "email_change", target_email=email)
     db.commit()
     try:
-        send_email(email, "Nexo: confirma tu correo",
-            "Confirma tu nuevo correo en los próximos 20 minutos:\n" + frontend_link("confirm-email", raw))
+        link = frontend_link("confirm-email", raw)
+        text, html = email_change_email(link, EMAIL_TOKEN_MINUTES)
+        send_email(email, "Nexo: confirma tu correo", text, html)
     except Exception:
         logger.exception("No fue posible enviar el correo de confirmación")
     return MessageResponse(message="Revisa el nuevo correo para confirmar el cambio")

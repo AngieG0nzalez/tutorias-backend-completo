@@ -1,3 +1,4 @@
+from datetime import datetime
 
 from decimal import Decimal
 
@@ -32,3 +33,22 @@ class TutorResponse(BaseModel):
     is_active: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TutorDirectoryItem(BaseModel):
+    user_id: int
+    name: str
+    specialty: str | None
+
+
+class AdminTutorSubjectCreate(BaseModel):
+    subject_id: int = Field(gt=0)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class AdminTutorSubjectResponse(BaseModel):
+    subject_id: int
+    name: str
+    grade: int
+    assigned_at: datetime | None = None

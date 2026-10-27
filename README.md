@@ -136,9 +136,20 @@ dbname=postgres
 secret_key=
 algorithm=HS256
 access_token_expire_minutes=60
+
+SMTP_HOST=HOST_DEL_PROVEEDOR
+SMTP_PORT=587
+SMTP_USER=USUARIO_SMTP
+SMTP_PASSWORD=CONTRASENA_SMTP
+SMTP_FROM="Nexo <remitente@dominio-autorizado.com>"
+FRONTEND_URL=http://localhost:5173
+CORS_ORIGINS=http://localhost:5173
 ```
 
-El backend también requiere las variables de correo, recuperación de cuenta y otras opciones que se hayan incorporado al código. **Revisa y actualiza `.env.example` para documentar sus nombres exactos, pero deja vacíos todos los secretos.**
+- `FRONTEND_URL`: base de los enlaces de los correos (recuperación de clave y cambio de correo).
+- `CORS_ORIGINS`: orígenes permitidos separados por coma, sin barra final (ej. `https://mi-front.vercel.app,http://localhost:5173`). Si no se define, se usa `http://localhost:5173`.
+
+`.env.example` documenta todos los nombres; deja vacíos o con marcadores todos los secretos.
 
 Para PostgreSQL alojado en Supabase, utiliza el host, puerto, usuario, contraseña y nombre de base de datos de tu proyecto. La conexión debe usar SSL cuando lo requiera Supabase.
 
@@ -179,11 +190,15 @@ Los métodos y rutas siguientes reflejan las funcionalidades trabajadas durante 
 | Cuenta | `PATCH /account/password`, `POST /account/email-change`, `POST /account/email-confirm` |
 | Usuarios | `/users`, `/users/me` |
 | Solicitudes administrativas | `/admin/registration-requests/history` |
-| Administración de usuarios | `GET /admin/users`, `GET /admin/users/{user_id}`, `PATCH /admin/users/{user_id}/status` |
-| Tutores | `/tutors`, `/tutor-panel/me`, `/tutor-panel/classes`, `/tutor-panel/subjects`, `/tutor-panel/summary` |
-| Materias y temas | `/subjects`, `/topics`, `/topics/{topic_id}/exercises` |
-| Clases e inscripciones | `/classes`, `/enrollments` |
-| Mensajes y reseñas | `/messages`, `/reviews` |
+| Administración de usuarios | `GET /admin/users`, `GET /admin/users/{user_id}`, `PATCH /admin/users/{user_id}`, `PATCH /admin/users/{user_id}/status` |
+| Asignación tutor–materia (admin) | `GET/POST /admin/tutors/{tutor_id}/subjects`, `DELETE /admin/tutors/{tutor_id}/subjects/{subject_id}` (409 si hay clases programadas) |
+| Tutores | `/tutors`, `GET /tutors/directory`, `/tutor-panel/me`, `/tutor-panel/classes`, `/tutor-panel/subjects`, `/tutor-panel/summary` |
+| Materias y temas | `/subjects`, `/topics`, `POST /topics`, `PATCH /topics/{id}`, `GET /topics/{topic_id}/exercises` |
+| Preguntas por tema (tutor) | `GET /topics/{id}/exercises/manage`, `POST /topics/{id}/exercises` (409 si duplicada), `DELETE` (baja lógica) |
+| Banco de preguntas | `GET /content/catalog`, `GET/POST /content/exercises`, `PATCH /content/exercises/{id}`, `PATCH .../status`, `POST .../new-version` (admin o tutor con la materia asignada) |
+| Sugerencias | `POST /suggestions`, `GET /suggestions/mine`, `GET /admin/suggestions`, `PATCH /admin/suggestions/{id}` (límite 5 por 10 min → 429) |
+| Clases e inscripciones | `/classes` (`POST`/`PATCH` propietario o admin), `/enrollments` |
+| Mensajes y reseñas | `/messages`, `GET /messages/contacts`, `/reviews` |
 | Intentos | `POST /attempts`, `GET /attempts/me` |
 | Progreso | `GET /progress/me`, `GET /progress/me/{topic_id}` |
 | Adaptación | `GET /adaptive/topics/{topic_id}/next` |
@@ -206,8 +221,10 @@ El sistema registra intentos, calcula progreso por tema y recomienda ejercicios 
 ### Roles y seguridad
 
 - `student`: consulta y practica con sus propios datos.
-- `tutor`: accede a las rutas de su panel.
-- `admin`: administra usuarios y solicitudes.
+- `tutor`: accede a su panel, gestiona clases, temas y preguntas de las materias que tiene asignadas.
+- `admin`: administra usuarios, asignaciones tutor–materia, banco de preguntas y sugerencias.
+
+Las preguntas de práctica nunca incluyen `is_correct`; solo se revela en la respuesta a un intento y en los endpoints de gestión (tutor/admin). Las preguntas con historial no se borran: se retiran (`is_active=false`) o se versionan.
 
 Los endpoints protegidos requieren:
 
@@ -223,9 +240,26 @@ La base de datos está en Supabase PostgreSQL y se consulta mediante SQLAlchemy 
 
 El proyecto original **no utiliza** `Base.metadata.create_all()` y presupone que las tablas existen y coinciden con los modelos. Las modificaciones del esquema se han realizado explícitamente en PostgreSQL/Supabase.
 
+Las migraciones manuales están en `migrations/`:
+
+- `001_create_suggestions.sql` (tabla `suggestions`) y su `001_create_suggestions_rollback.sql`.
+
+Se aplican a mano en el SQL Editor de Supabase, tras un backup. Nunca ejecutes el rollback sin revisar los datos.
+
 Antes de producción, verifica que los cambios recientes de cuentas, tokens y auditoría estén aplicados. **Alembic** queda como mejora futura para versionar migraciones; no lo ejecutes sin configurarlo previamente.
 
-## 10. Pruebas con Bruno
+## 10. Pruebas automáticas y con Bruno
+
+Pruebas focalizadas (no requieren base de datos):
+
+```bash
+pip install pytest
+python -m pytest tests -q
+```
+
+Cubren: ausencia de `is_correct` en práctica, validación de 4 opciones / una correcta, rutas duplicadas, dependencias de autenticación y CORS configurable.
+
+### Bruno
 
 1. Importa o abre la colección de Bruno del proyecto.
 2. Selecciona el entorno local o Render.
@@ -274,7 +308,7 @@ Si el servicio está en **Render Free**, comprueba la conectividad antes de conf
 
 ### CORS
 
-Cuando el frontend se despliegue en Vercel, añade su dominio HTTPS real a los orígenes permitidos de CORS en FastAPI. No utilices `*` con credenciales en producción.
+Define `CORS_ORIGINS` en Render con el dominio HTTPS real del frontend (y `FRONTEND_URL` con la misma URL). No utilices `*` con credenciales en producción.
 
 ## 12. Estructura principal
 
@@ -287,7 +321,11 @@ tutorias-backend-completo/
 │   ├── models/
 │   ├── routers/
 │   ├── schemas/
+│   ├── services/        # lógica adaptativa, plantillas de correo
+│   ├── assets/          # logo de los correos
 │   └── main.py
+├── migrations/          # SQL manual para Supabase
+├── tests/
 ├── scripts/
 ├── .env.example
 ├── .gitignore
@@ -326,13 +364,13 @@ deactivate
 
 ### Frontend
 
-- [ ] 15. Login React mejorado
-- [ ] 16. Solicitud de inscripción
-- [ ] 17. Sesión y rutas protegidas
-- [ ] 18. Panel Student
-- [ ] 19. Panel Admin
-- [ ] 20. Panel Tutor
-- [ ] 21. Conectar frontend con FastAPI
+- [x] 15. Login React mejorado
+- [x] 16. Solicitud de inscripción
+- [x] 17. Sesión y rutas protegidas
+- [x] 18. Panel Student
+- [x] 19. Panel Admin
+- [x] 20. Panel Tutor
+- [x] 21. Conectar frontend con FastAPI (validación manual en navegador pendiente)
 - [ ] 22. Frontend en Vercel
 
 ### Inteligencia artificial
