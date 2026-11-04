@@ -234,6 +234,17 @@ Authorization: Bearer <JWT>
 
 El backend valida el usuario autenticado, sus permisos y el estado de su cuenta. El cambio de contraseña invalida tokens anteriores mediante el mecanismo de versión de sesión implementado en el proyecto.
 
+### IA local (Etapa 23, opcional)
+
+| Método | Ruta | Rol | Descripción |
+|---|---|---|---|
+| POST | `/ai/explanations` | student | Explica un intento propio (`{"attempt_id"}`). Sin Ollama: explicación del tutor o 503. |
+| POST | `/ai/exercise-drafts` | tutor | Borrador de pregunta para un tema de una materia asignada. No guarda nada. |
+
+Desactivada por defecto (`AI_ENABLED=false`). Solo para desarrollo local con Ollama; Render no puede alcanzar el `localhost` de tu Mac. Ver `ETAPA_23_EJECUCION_LOCAL.md` en el repositorio del frontend.
+
+**IA en la nube con respaldo local (demo).** Con `AI_CLOUD_ENABLED=true`, `OLLAMA_API_KEY` y `OLLAMA_CLOUD_MODEL`, el backend llama primero a Ollama Cloud (`https://ollama.com`, header `Authorization: Bearer`). Si falla, expira, devuelve 402/429 o se agota `AI_CLOUD_DAILY_LIMIT` (tope diario global, en memoria y por proceso), usa Ollama local cuando `AI_ENABLED=true`; si no, responde la explicación curada o 503. En Render deja `AI_ENABLED=false` y define las variables de nube en el panel (la clave nunca va en el repositorio). Aplica también a `/ai/chat`. Los textos de los estudiantes salen hacia Ollama Cloud: informa a los usuarios.
+
 ## 9. Base de datos y migraciones
 
 La base de datos está en Supabase PostgreSQL y se consulta mediante SQLAlchemy y Psycopg 3.

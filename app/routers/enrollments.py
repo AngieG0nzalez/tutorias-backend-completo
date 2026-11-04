@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -63,7 +63,8 @@ def get_enrollments(
     return db.scalars(query).all()
 
 
-# Catálogo del estudiante: clases programadas de su grado (sin IDs de tutor ajenos).
+# Catálogo del estudiante: clases programadas de su grado más su historial
+# de inscripciones (sin IDs de tutor ajenos).
 @router.get(
     "/catalog",
     response_model=list[StudentClassCatalogItem],
@@ -92,10 +93,17 @@ def get_student_class_catalog(
             & (Enrollment.user_id == current_user.id),
         )
         .where(
-            Subject.grade == grade,
-            TutoringClass.status == "scheduled",
-            Tutor.is_active.is_(True),
-            User.is_active.is_(True),
+            # Disponibles: programadas de su grado. Historial: todas las
+            # clases en las que ya está inscrito, sea cual sea su estado.
+            or_(
+                Enrollment.id.is_not(None),
+                and_(
+                    Subject.grade == grade,
+                    TutoringClass.status == "scheduled",
+                    Tutor.is_active.is_(True),
+                    User.is_active.is_(True),
+                ),
+            )
         )
         .order_by(TutoringClass.date_time, TutoringClass.id)
     ).all()
@@ -253,6 +261,20 @@ def delete_enrollment(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para eliminar esta inscripción",
         )
+
+    # El estudiante solo cancela mientras la clase sigue programada; el
+    # administrador conserva la excepción para corrección de datos.
+    if not is_admin:
+        class_status = db.scalar(
+            select(TutoringClass.status).where(
+                TutoringClass.id == enrollment.class_id
+            )
+        )
+        if class_status != "scheduled":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Solo puedes cancelar inscripciones de clases programadas",
+            )
 
     db.delete(enrollment)
     db.commit()

@@ -115,4 +115,4 @@ def world(db):
     ])
     db.commit()
     return dict(s1=s1, s2=s2, s3=s3, ta=ta, tb=tb, adm=adm, cA=cA, cB=cB,
-                t1=t1, t2=t2, t3=t3, alg=alg)
+                t1=t1, t2=t2, t3=t3, alg=alg, geo=geo, t_inactive=t_inactive)

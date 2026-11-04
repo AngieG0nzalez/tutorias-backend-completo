@@ -49,6 +49,7 @@ class TutorPanelStudent(BaseModel):
 class TutorPanelSummary(BaseModel):
     total_classes: int
     scheduled_classes: int
+    in_progress_classes: int = 0
     completed_classes: int
     cancelled_classes: int
     total_enrollments: int

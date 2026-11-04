@@ -318,6 +318,14 @@ def get_my_tutor_summary(
         )
     ) or 0
 
+    in_progress_classes = db.scalar(
+        select(func.count(TutoringClass.id))
+        .where(
+            TutoringClass.tutor_id == tutor.id,
+            TutoringClass.status == "in_progress",
+        )
+    ) or 0
+
     completed_classes = db.scalar(
         select(func.count(TutoringClass.id))
         .where(
@@ -351,6 +359,7 @@ def get_my_tutor_summary(
     return TutorPanelSummary(
         total_classes=total_classes,
         scheduled_classes=scheduled_classes,
+        in_progress_classes=in_progress_classes,
         completed_classes=completed_classes,
         cancelled_classes=cancelled_classes,
         total_enrollments=total_enrollments,

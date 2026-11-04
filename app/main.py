@@ -29,6 +29,7 @@ from app.routers import (
     admin_tutor_subjects,
     content,
     suggestions,
+    ai,
 )
 
 
@@ -106,6 +107,7 @@ app.include_router(account.router)
 app.include_router(admin_tutor_subjects.router)
 app.include_router(content.router)
 app.include_router(suggestions.router)
+app.include_router(ai.router)
 
 @app.get("/")
 def root():
