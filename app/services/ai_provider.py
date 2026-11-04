@@ -3,10 +3,13 @@ from typing import Protocol
 
 import httpx
 
+import logging
 import threading
 from datetime import datetime, timezone
 
 from app.core.ai_config import AISettings, CloudSettings, get_ai_settings, get_cloud_settings
+
+log = logging.getLogger("nexo.ai")
 
 
 class AIProviderError(Exception):
@@ -60,10 +63,14 @@ class OllamaProvider:
                 timeout=self.timeout,
             )
         except httpx.TimeoutException:
+            log.warning("IA %s: timeout (modelo=%s)", self.base_url, self.model)
             raise AIProviderError("timeout")
-        except httpx.HTTPError:
+        except httpx.HTTPError as exc:
+            log.warning("IA %s: error de conexión %s", self.base_url, type(exc).__name__)
             raise AIProviderError("unavailable")
         if response.status_code != 200:
+            # Solo código y host: nunca la clave ni el contenido de la conversación.
+            log.warning("IA %s: HTTP %s (modelo=%s)", self.base_url, response.status_code, self.model)
             raise AIProviderError("unavailable")
         try:
             content = response.json()["message"]["content"]
