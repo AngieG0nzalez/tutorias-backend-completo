@@ -4,6 +4,7 @@ from typing import Protocol
 import httpx
 
 import logging
+import os
 import threading
 from datetime import datetime, timezone
 
@@ -137,6 +138,11 @@ def get_ai_provider() -> AIProvider:
     cloud_cfg: CloudSettings = get_cloud_settings()
     local = OllamaProvider(settings) if settings.enabled else None
     if not cloud_cfg.enabled:
+        if os.getenv("AI_CLOUD_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}:
+            missing = [n for n in ("OLLAMA_API_KEY", "OLLAMA_CLOUD_MODEL") if not os.getenv(n, "").strip()]
+            log.warning("IA nube desactivada: faltan variables %s", missing)
+        else:
+            log.warning("IA nube desactivada: AI_CLOUD_ENABLED no es true")
         return local or DisabledProvider()
     cloud = OllamaProvider(
         settings,

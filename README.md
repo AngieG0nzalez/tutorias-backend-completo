@@ -1,8 +1,8 @@
-# Nexo — Backend de tutorías de matemáticas
+# 🎓 Nexo — Backend de tutorías de matemáticas
 
 API REST de **Nexo**, plataforma educativa de tutorías y aprendizaje adaptativo para estudiantes de grados **9.º, 10.º y 11.º**.
 
-## Tecnologías
+## 🧰 Tecnologías
 
 - **Python 3.12** y **FastAPI**
 - **SQLAlchemy 2**, **Pydantic** y **Psycopg 3**
@@ -10,9 +10,10 @@ API REST de **Nexo**, plataforma educativa de tutorías y aprendizaje adaptativo
 - **JWT** para autenticación y permisos por rol (`student`, `tutor`, `admin`)
 - **Bruno** para pruebas de API
 - **Render** para el despliegue del backend
+- **Ollama** (local o Cloud) para la IA
 - **Brevo** para correos de recuperación y confirmación (según configuración del proyecto)
 
-## 1. Requisitos
+## 📋 1. Requisitos
 
 - Python **3.12.x**
 - Git
@@ -22,7 +23,7 @@ API REST de **Nexo**, plataforma educativa de tutorías y aprendizaje adaptativo
 
 > Crea un entorno virtual nuevo en cada sistema operativo. **Nunca copies `.venv` entre Windows, macOS y Linux.**
 
-## 2. Descargar el proyecto
+## ⬇️ 2. Descargar el proyecto
 
 ```bash
 git clone <URL_DE_TU_REPOSITORIO>
@@ -31,7 +32,7 @@ cd tutorias-backend-completo
 
 Si ya tienes el repositorio, entra en su carpeta y actualízalo mediante `git pull` cuando corresponda.
 
-## 3. Instalar y ejecutar en Windows (PowerShell)
+## 🪟 3. Instalar y ejecutar en Windows (PowerShell)
 
 Comprueba Python 3.12:
 
@@ -66,7 +67,7 @@ python -m uvicorn app.main:app --reload
 
 Si prefieres no activar el entorno, puedes utilizar directamente `.\.venv\Scripts\python.exe` en los comandos.
 
-## 4. Instalar y ejecutar en macOS (Zsh)
+## 🍎 4. Instalar y ejecutar en macOS (Zsh)
 
 Si todavía no tienes Python 3.12 y usas Homebrew:
 
@@ -91,7 +92,7 @@ python -m uvicorn app.main:app --reload
 
 En Mac Apple Silicon, Homebrew suele instalar Python en `/opt/homebrew/bin/python3.12`. En Intel la ruta puede ser diferente; usa `command -v python3.12` para localizarlo.
 
-## 5. Instalar y ejecutar en Ubuntu y Linux Mint (Bash)
+## 🐧 5. Instalar y ejecutar en Ubuntu y Linux Mint (Bash)
 
 Primero comprueba si Python 3.12 está instalado:
 
@@ -122,7 +123,7 @@ cp .env.example .env
 python -m uvicorn app.main:app --reload
 ```
 
-## 6. Variables de entorno
+## 🔑 6. Variables de entorno
 
 Copia `.env.example` a `.env` y completa las variables que **realmente consume tu código**. La configuración original del proyecto incluye:
 
@@ -144,10 +145,16 @@ SMTP_PASSWORD=CONTRASENA_SMTP
 SMTP_FROM="Nexo <remitente@dominio-autorizado.com>"
 FRONTEND_URL=http://localhost:5173
 CORS_ORIGINS=http://localhost:5173
+
+# IA (ver «IA» en el apartado 8)
+AI_ENABLED=false
+AI_CLOUD_ENABLED=false
+OLLAMA_CLOUD_MODEL=
+OLLAMA_API_KEY=
 ```
 
 - `FRONTEND_URL`: base de los enlaces de los correos (recuperación de clave y cambio de correo).
-- `CORS_ORIGINS`: orígenes permitidos separados por coma, sin barra final (ej. `https://mi-front.vercel.app,http://localhost:5173`). Si no se define, se usa `http://localhost:5173`.
+- `CORS_ORIGINS`: orígenes permitidos separados por coma, sin barra final (producción: `https://nexo-frontend-rho.vercel.app,http://localhost:5173`). Si no se define, se usa `http://localhost:5173`.
 
 `.env.example` documenta todos los nombres; deja vacíos o con marcadores todos los secretos.
 
@@ -160,7 +167,7 @@ Para PostgreSQL alojado en Supabase, utiliza el host, puerto, usuario, contrase�
 - Configura los secretos de producción en **Render → Environment**, nunca dentro del repositorio.
 - No compartas las credenciales de Supabase entre proyectos distintos.
 
-## 7. Comprobar el funcionamiento local
+## ✅ 7. Comprobar el funcionamiento local
 
 Con el servidor iniciado:
 
@@ -180,7 +187,7 @@ Respuesta esperada de `/health`, si el endpoint mantiene el contrato original:
 
 La respuesta real puede variar si se ha actualizado el endpoint. Compruébala en Swagger.
 
-## 8. Módulos y endpoints principales
+## 🧩 8. Módulos y endpoints principales
 
 Los métodos y rutas siguientes reflejan las funcionalidades trabajadas durante el desarrollo. **Consulta `/docs` como fuente de verdad del despliegue actual** para conocer todos los métodos, parámetros y esquemas.
 
@@ -234,18 +241,29 @@ Authorization: Bearer <JWT>
 
 El backend valida el usuario autenticado, sus permisos y el estado de su cuenta. El cambio de contraseña invalida tokens anteriores mediante el mecanismo de versión de sesión implementado en el proyecto.
 
-### IA local (Etapa 23, opcional)
+### 🤖 IA (Etapa 23 + nube con respaldo local)
 
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
-| POST | `/ai/explanations` | student | Explica un intento propio (`{"attempt_id"}`). Sin Ollama: explicación del tutor o 503. |
+| POST | `/ai/explanations` | student | Explica un intento propio (`{"attempt_id"}`). Sin IA: explicación del tutor o 503. |
 | POST | `/ai/exercise-drafts` | tutor | Borrador de pregunta para un tema de una materia asignada. No guarda nada. |
+| POST | `/ai/chat` | student | Chat de estudio con historial enviado por el cliente. No guarda conversaciones. |
 
-Desactivada por defecto (`AI_ENABLED=false`). Solo para desarrollo local con Ollama; Render no puede alcanzar el `localhost` de tu Mac. Ver `ETAPA_23_EJECUCION_LOCAL.md` en el repositorio del frontend.
+**Orden de uso:** ☁️ nube (`AI_CLOUD_ENABLED=true`) → 💻 local (`AI_ENABLED=true`) → ❌ sin IA. El local es el respaldo si la nube falla, devuelve 402/429, expira o se agota el tope diario.
 
-**IA en la nube con respaldo local (demo).** Con `AI_CLOUD_ENABLED=true`, `OLLAMA_API_KEY` y `OLLAMA_CLOUD_MODEL`, el backend llama primero a Ollama Cloud (`https://ollama.com`, header `Authorization: Bearer`). Si falla, expira, devuelve 402/429 o se agota `AI_CLOUD_DAILY_LIMIT` (tope diario global, en memoria y por proceso), usa Ollama local cuando `AI_ENABLED=true`; si no, responde la explicación curada o 503. En Render deja `AI_ENABLED=false` y define las variables de nube en el panel (la clave nunca va en el repositorio). Aplica también a `/ai/chat`. Los textos de los estudiantes salen hacia Ollama Cloud: informa a los usuarios.
+| Modo | `AI_CLOUD_ENABLED` | `AI_ENABLED` | Notas |
+|---|---|---|---|
+| 🧪 Pruebas locales (no gasta tokens) | `false` | `true` | Ollama abierto y `ollama pull qwen2.5:7b` |
+| 🌍 Render / demo | `true` | `false` | Requiere `OLLAMA_API_KEY` y `OLLAMA_CLOUD_MODEL` |
+| 🔁 Nube + respaldo local | `true` | `true` | Solo en tu Mac |
 
-## 9. Base de datos y migraciones
+- 💰 `AI_CLOUD_DAILY_LIMIT` (200 por defecto): tope diario global de llamadas a la nube, en memoria y por proceso (válido para demo, no es control de gasto real). A esto se suma el límite de 10 mensajes por minuto por usuario.
+- 🔑 `OLLAMA_API_KEY` solo viaja en el header `Authorization: Bearer` y no se registra. Va en **Render → Environment** o en tu `.env` local, nunca en el repositorio.
+- 🔎 Si la IA falla, los logs (`nexo.ai`) muestran el código HTTP del proveedor o qué variable falta: `401` clave incorrecta, `402` sin créditos, `404` modelo inexistente, `429` límite.
+- 🧒 Los textos de los estudiantes salen hacia Ollama Cloud: el frontend lo advierte en el chat.
+- Detalles de uso local: `ETAPA_23_EJECUCION_LOCAL.md` (repositorio del frontend).
+
+## 🗄️ 9. Base de datos y migraciones
 
 La base de datos está en Supabase PostgreSQL y se consulta mediante SQLAlchemy y Psycopg 3.
 
@@ -259,7 +277,7 @@ Se aplican a mano en el SQL Editor de Supabase, tras un backup. Nunca ejecutes e
 
 Antes de producción, verifica que los cambios recientes de cuentas, tokens y auditoría estén aplicados. **Alembic** queda como mejora futura para versionar migraciones; no lo ejecutes sin configurarlo previamente.
 
-## 10. Pruebas automáticas y con Bruno
+## 🧪 10. Pruebas automáticas y con Bruno
 
 Pruebas focalizadas (no requieren base de datos):
 
@@ -281,7 +299,7 @@ Cubren: ausencia de `is_correct` en práctica, validación de 4 opciones / una c
 
 La colección debe apuntar a `http://127.0.0.1:8000` en local o a la URL pública de Render en producción.
 
-## 11. Despliegue en Render
+## ☁️ 11. Despliegue en Render
 
 Servicio existente:
 
@@ -319,9 +337,18 @@ Si el servicio está en **Render Free**, comprueba la conectividad antes de conf
 
 ### CORS
 
-Define `CORS_ORIGINS` en Render con el dominio HTTPS real del frontend (y `FRONTEND_URL` con la misma URL). No utilices `*` con credenciales en producción.
+Define en Render → Environment, sin barra final:
 
-## 12. Estructura principal
+```dotenv
+CORS_ORIGINS=https://nexo-frontend-rho.vercel.app,http://localhost:5173
+FRONTEND_URL=https://nexo-frontend-rho.vercel.app
+```
+
+No utilices `*` con credenciales en producción. Las variables de IA de la demo (`AI_CLOUD_ENABLED=true`, `AI_ENABLED=false`, `OLLAMA_API_KEY`, `OLLAMA_CLOUD_MODEL`) se definen en el mismo panel.
+
+> 😴 En **Render Free** el servicio se duerme tras un rato sin uso: la primera petición puede tardar 50 s o más.
+
+## 🗂️ 12. Estructura principal
 
 ```text
 tutorias-backend-completo/
@@ -346,7 +373,7 @@ tutorias-backend-completo/
 
 `.env` y `.venv/` se crean localmente y no deben subirse a Git.
 
-## 13. Detener el servidor y salir del entorno
+## 🛑 13. Detener el servidor y salir del entorno
 
 Presiona **Ctrl + C** para detener Uvicorn y luego ejecuta:
 
@@ -354,7 +381,7 @@ Presiona **Ctrl + C** para detener Uvicorn y luego ejecuta:
 deactivate
 ```
 
-## 14. Roadmap del proyecto
+## 🗺️ 14. Roadmap del proyecto
 
 ### Backend
 
@@ -382,11 +409,11 @@ deactivate
 - [x] 19. Panel Admin
 - [x] 20. Panel Tutor
 - [x] 21. Conectar frontend con FastAPI (validación manual en navegador pendiente)
-- [ ] 22. Frontend en Vercel
+- [x] 22. Frontend en Vercel
 
 ### Inteligencia artificial
 
-- [ ] 23. IA local
+- [x] 23. IA local
 - [ ] 24. Pruebas IA
 - [ ] 25. Comparativa de modelos/proveedores
 - [ ] 26. Elegir IA de producción
