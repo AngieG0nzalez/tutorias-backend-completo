@@ -333,7 +333,7 @@ Fija explícitamente la versión compatible con tu proyecto mediante el mecanism
 
 ### Correo transaccional
 
-Si el servicio está en **Render Free**, comprueba la conectividad antes de confiar en SMTP: los puertos salientes SMTP habituales pueden estar restringidos. Para Brevo, puede ser necesario utilizar su API HTTPS en lugar de SMTP. La prueba local de envío de correo no demuestra por sí sola que funcione en Render.
+Si el servicio está en **Render Free**, comprueba la conectividad antes de confiar en SMTP: los puertos salientes SMTP habituales pueden estar restringidos. **Con Brevo, define `BREVO_API_KEY` en Render**: el backend envía por su API HTTPS (`https://api.brevo.com/v3/smtp/email`) y no usa SMTP. `SMTP_FROM` debe ser un remitente verificado en Brevo (Senders & IP). En esta vía el correo no incluye el logo incrustado. Sin `BREVO_API_KEY` se usa SMTP, útil en local. La prueba local de envío de correo no demuestra por sí sola que funcione en Render.
 
 ### CORS
 

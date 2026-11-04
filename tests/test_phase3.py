@@ -96,3 +96,49 @@ def test_registro_nombre_largo_422(client):
         "name": "x" * 101, "email": "a@b.co", "password": "ClaveCorrecta1", "role": "student",
     })
     assert r.status_code == 422
+
+
+def test_correo_usa_api_https_de_brevo_si_hay_clave(monkeypatch):
+    import httpx
+    import pytest
+    from app.services import account_security as sec
+
+    monkeypatch.setenv("BREVO_API_KEY", "clave-brevo-prueba")
+    monkeypatch.setenv("SMTP_FROM", "Nexo <no-reply@nexo.test>")
+    monkeypatch.setenv("FRONTEND_URL", "https://front.test")
+    monkeypatch.setattr(sec.smtplib, "SMTP", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no debe usar SMTP")))
+    seen = {}
+
+    def fake(url, json=None, headers=None, timeout=None):
+        seen.update(url=url, json=json, headers=headers)
+        return httpx.Response(201, json={})
+
+    monkeypatch.setattr(httpx, "post", fake)
+    assert sec.smtp_ready()
+    sec.send_email("a@b.co", "Asunto", "texto", '<p>hola</p><img src="cid:nexo-logo">')
+    assert seen["url"] == "https://api.brevo.com/v3/smtp/email"
+    assert seen["headers"]["api-key"] == "clave-brevo-prueba"
+    assert seen["json"]["sender"] == {"email": "no-reply@nexo.test", "name": "Nexo"}
+    assert "cid:" not in seen["json"]["htmlContent"]
+
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: httpx.Response(401, json={}))
+    with pytest.raises(RuntimeError) as e:
+        sec.send_email("a@b.co", "A", "t")
+    assert "clave-brevo" not in str(e.value)
+
+
+def test_correo_acepta_clave_api_en_smtp_password(monkeypatch):
+    import httpx
+    from app.services import account_security as sec
+
+    monkeypatch.delenv("BREVO_API_KEY", raising=False)
+    monkeypatch.setenv("SMTP_PASSWORD", "xkeysib-prueba")
+    monkeypatch.setenv("SMTP_FROM", "no-reply@nexo.test")
+    monkeypatch.setenv("FRONTEND_URL", "https://front.test")
+    seen = {}
+    monkeypatch.setattr(httpx, "post", lambda url, json=None, headers=None, timeout=None: seen.update(h=headers) or httpx.Response(201, json={}))
+    sec.send_email("a@b.co", "A", "t")
+    assert seen["h"]["api-key"] == "xkeysib-prueba"
+
+    monkeypatch.setenv("SMTP_PASSWORD", "xsmtpsib-clave-smtp")
+    assert sec.brevo_api_ready() is False
