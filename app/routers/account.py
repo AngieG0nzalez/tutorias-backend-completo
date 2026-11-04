@@ -39,6 +39,7 @@ def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
     email = str(data.email).strip().lower()
     user = db.scalar(select(User).where(func.lower(User.email) == email, User.is_active.is_(True)))
     if user is None:
+        logger.info("forgot-password: no existe usuario activo con ese correo; no se envía nada")
         return message
     # Máximo 3 solicitudes en una hora por cuenta. Añadir limitación por IP en proxy/API gateway.
     recent = db.scalar(select(func.count(AccountToken.id)).where(
@@ -47,6 +48,7 @@ def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
         AccountToken.created_at >= now_utc() - timedelta(hours=1),
     )) or 0
     if recent >= 3:
+        logger.info("forgot-password: límite de 3 solicitudes por hora alcanzado; no se envía nada")
         return message
     raw = issue_token(db, user.id, "password_reset")
     db.commit()
@@ -54,6 +56,7 @@ def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
         link = frontend_link("reset-password", raw)
         text, html = password_reset_email(link, TOKEN_MINUTES)
         send_email(user.email, "Nexo: recupera tu contraseña", text, html)
+        logger.info("forgot-password: correo entregado al proveedor")
     except Exception:
         logger.exception("No fue posible enviar el correo de recuperación")
     return message
